@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    /* Opciones Base */
+    "target": "ES2020",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Rutas del Proyecto */
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    /* Le dice a TS qué tipos de 'ambiente' cargar (node) */
+    "types": ["node"]
+    
+    /* Nota: Hemos quitado 'typeRoots' */
+  },
+  
+  /* --- LA MAGIA ESTÁ AQUÍ --- */
+  /* Le decimos a TS qué archivos incluir en la compilación */
+  "include": [
+    "src/**/*", // <-- Incluye todo en 'src' (como antes)
+    "src/types/express/index.d.ts" // <-- FORZAMOS la inclusión del archivo
+  ]
+}
