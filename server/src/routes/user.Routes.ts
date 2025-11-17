@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createUser, getAllUsers, getMedicos } from '../controllers/user.Controller';
+import { createUser, getAllUsers, getMedicos, updateUser } from '../controllers/user.Controller';
 import { checkAuth } from '../middlewares/checkAuth';
 import { checkRole } from '../middlewares/checkRole';
 
@@ -26,6 +26,14 @@ router.get(
   checkAuth,
   checkRole(['RECEPCIONISTA', 'ADMIN']),
   getMedicos
+);
+
+// Ruta para actualizar usuario (solo ADMIN)
+router.put(
+  '/:id',
+  checkAuth,
+  checkRole(['ADMIN']),
+  updateUser
 );
 
 export default router;

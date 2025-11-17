@@ -113,3 +113,30 @@ export const updateAppointmentStatus = async (req: Request, res: Response) => {
     }
   }
 };
+
+// --- Modificar Turno Completo (Recepcionista) ---
+export const updateAppointment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  // Extraemos todo lo que se puede cambiar
+  const { fecha, hora, motivo, medico, estado } = req.body; 
+
+  try {
+    const appointment = await Appointment.findById(id);
+    if (!appointment) return res.status(404).json({ message: 'Turno no encontrado' });
+
+    // Solo Recepcionista puede usar esta ruta completa
+    // (Aunque el middleware checkRole ya nos protege, validamos lógica)
+    
+    // Actualizamos los campos si vienen en el body
+    if (fecha) appointment.fecha = fecha;
+    if (hora) appointment.hora = hora;
+    if (motivo) appointment.motivo = motivo;
+    if (medico) appointment.medico = medico;
+    if (estado) appointment.estado = estado; // Aquí enviarán 'CANCELADO'
+
+    await appointment.save();
+    res.json(appointment);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al modificar el turno' });
+  }
+};

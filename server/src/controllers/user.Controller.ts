@@ -69,3 +69,29 @@ export const getMedicos = async (req: Request, res: Response) => {
     }
   }
 };
+
+// ---- actualizar usuario (solo admin, para cambiar rol) ----
+export const updateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { role, username } = req.body;
+
+  try {
+    // buscar y actualizar
+    const user = await User.findByIdAndUpdate(
+      id,
+      { role, username },
+      { new: true } // para devolver el documento actualizado
+    ).select('-password'); // excluir password
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    res.json(user);
+
+  } catch (error) {
+    // .... manejo de errores estandar ....
+    res.status(500).json({ message: 'Error al actualizar el usuario', error: error instanceof Error ? error.message : 'Error desconocido' });
+  }
+
+};
