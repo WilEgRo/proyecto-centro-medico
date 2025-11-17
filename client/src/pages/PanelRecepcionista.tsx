@@ -15,6 +15,7 @@ interface Medico{
     username: string; // El nombre del medico es su username
 }
 
+
 interface Appointment {
     _id: string;
     paciente: {
