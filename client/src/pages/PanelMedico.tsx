@@ -115,50 +115,74 @@ const PanelMedico = () => {
 
 // --- Objeto de Estilos ---
 const styles: { [key: string]: CSSProperties } = {
-    container: {
-        width: '100%',
-    },
-    heading: {
-        borderBottom: '2px solid #007bff',
-        paddingBottom: '0.5rem',
-        marginBottom: '1.5rem',
-    },
-    error: {
-        color: 'red',
-        backgroundColor: '#ffebeB',
-        padding: '10px',
-        borderRadius: '4px',
-    },
-    table: {
-        width: '100%',
-        borderCollapse: 'collapse',
-        marginTop: '1rem',
-    },
-    th: {
-        border: '1px solid #ddd',
-        padding: '12px',
-        backgroundColor: '#f2f2f2',
-        textAlign: 'left',
-    },
-    td: {
-        border: '1px solid #ddd',
-        padding: '12px',
-    },
-    button: {
-        padding: '8px 12px',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        color: 'white',
-        marginRight: '5px',
-        fontSize: '14px',
-    },
-    buttonAtendido: {
-        backgroundColor: '#5cb85c', // Verde
-    },
-    buttonAusente: {
-        backgroundColor: '#f0ad4e', // Naranja
-    },
+  container: {
+    width: "100%",
+    fontFamily:
+      "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
+    maxWidth: 1200,
+    margin: "0 auto",
+  },
+  heading: {
+    borderBottom: "2px solid rgba(99,102,241,0.18)",
+    paddingBottom: "0.5rem",
+    marginBottom: "1.25rem",
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: 700,
+  },
+  error: {
+    color: "#7f1d1d",
+    backgroundColor: "#ffefef",
+    border: "1px solid #fca5a5",
+    padding: "10px 12px",
+    borderRadius: 8,
+    marginBottom: 12,
+    fontSize: 13,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    marginTop: "1rem",
+    background: "linear-gradient(180deg, #ffffff, #fbfbff)",
+    borderRadius: 12,
+    boxShadow: "0 8px 20px rgba(15,23,42,0.04)",
+    overflow: "hidden",
+  },
+  th: {
+    borderBottom: "1px solid rgba(15,23,42,0.06)",
+    padding: "12px",
+    backgroundColor: "#f8fafc",
+    textAlign: "left",
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#0f172a",
+  },
+  td: {
+    borderBottom: "1px solid rgba(15,23,42,0.04)",
+    padding: "12px",
+    verticalAlign: "middle",
+    fontSize: 14,
+    color: "#0f172a",
+  },
+  button: {
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 10,
+    cursor: "pointer",
+    color: "white",
+    marginRight: "8px",
+    fontSize: 14,
+    fontWeight: 700,
+    boxShadow: "0 6px 16px rgba(99,102,241,0.12)",
+    transition: "transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
+  },
+  buttonAtendido: {
+    background: "linear-gradient(90deg,#10b981,#34d399)", // verde gradiente
+  },
+  buttonAusente: {
+    background: "linear-gradient(90deg,#f59e0b,#f97316)", // naranja gradiente
+  },
 };
+
 
 export default PanelMedico;

@@ -47,6 +47,7 @@ const PanelRecepcionista = () => {
     const [filterEstado, setFilterEstado] = useState<string>('');
 
     const [loading, setLoading] = useState(true);
+    const [loadingPatients, setLoadingPatients] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
 
@@ -70,7 +71,8 @@ const PanelRecepcionista = () => {
     // --- Efecto para cargar todos los datos ---
     useEffect(() => {
         fetchData();
-    }, []); // recarga al cambiar filtros
+        buscarTurnos();
+    }, []);
 
     // --- Función para cargar datos desde la API ---
     const fetchData = async () => {
@@ -111,10 +113,14 @@ const PanelRecepcionista = () => {
         } finally {
             setLoading(false);
         }
+    };
 
+    // --- Función para buscar turnos (inicial y con filtros) ---
+    const buscarTurnos = async () => {
+        setLoadingPatients(true);
         // cargar turnos con filtros
         try {
-            let url = '/appointments?estado=PROGRAMADO';
+            let url = '/appointments?';
             if (filterMedico) url += `medicoId=${filterMedico}&`;
             if (filterEstado) url += `estado=${filterEstado}&`;
 
@@ -124,8 +130,11 @@ const PanelRecepcionista = () => {
 
         } catch (error) {
             console.error("Error cargando turnos con filtros:", error);
+        } finally {
+            setLoadingPatients(false);
         }
-    };
+    }
+
 
     // ------ manejadores de formularios ------
     const handlePatientChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,7 +152,13 @@ const PanelRecepcionista = () => {
         setError(null);
         setMessage(null);
         try {
-            const response = await api.post<Patient>('/patients', patientForm);
+
+            const payload = {
+                ...patientForm,
+                fechaNacimiento: patientForm.fechaNacimiento ? `${patientForm.fechaNacimiento}T12:00:00` : ''
+            }
+
+            const response = await api.post<Patient>('/patients', payload);
             setPatients(prevPatients => {
                 if (Array.isArray(prevPatients)) {
                     return [...prevPatients, response.data];
@@ -192,15 +207,19 @@ const PanelRecepcionista = () => {
 
     const handleSubmitTurno = async (e: React.FormEvent) => {
         e.preventDefault();
+        const payload = {
+            ...appointmentForm,
+            fecha: appointmentForm.fecha ? `${appointmentForm.fecha}T12:00:00` : ''
+        }
         try {
             if (editingId) {
                 // MODO EDICIÓN
-                await api.put(`/appointments/${editingId}`, appointmentForm);
+                await api.put(`/appointments/${editingId}`, payload);
                 alert('Turno actualizado con éxito');
                 setEditingId(null);
             } else {
                 // MODO CREACIÓN
-                await api.post('/appointments', appointmentForm);
+                await api.post('/appointments', payload);
                 alert('Turno creado éxito');
             }
             // limpiar y recargar
@@ -239,7 +258,7 @@ const PanelRecepcionista = () => {
                                     <td style={styles.td}>{p.nombreCompleto}</td>
                                     <td style={styles.td}>{p.CI}</td>
                                     <td style={styles.td}>{p.telefono}</td>
-                                    <td style={styles.td}>{new Date(p.fechaNacimiento).toLocaleDateString()}</td>
+                                    <td style={styles.td}>{new Date(p.fechaNacimiento).toLocaleDateString('es-BO', { timeZone: 'UTC' })}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -320,27 +339,70 @@ const PanelRecepcionista = () => {
 
                     {/* --- Sección 2: Listado de Turnos y Filtros --- */}
                     <div style={styles.listContainer}>
+                        {/* Encabezado */}
                         <h2 style={styles.heading}>Turnos Programados</h2>
+
                         {/* Filtrar por turnos */}
                         <div style={styles.filtro}>
-                            <strong>Filtrar Turnos</strong>
-                            <select onChange={(e) => setFilterMedico(e.target.value)}> 
-                                <option value="">Todos los medicos</option>
-                                {medicos.map(m => (
-                                    <option key={m._id} value={m._id}>{m.username}</option>
-                                ))}
-                            </select>
-                            <select onChange={(e) => setFilterEstado(e.target.value)}>
-                                <option value="">Todos los estados</option>
-                                <option value="PROGRAMADO">PROGRAMADO</option>
-                                <option value="ATENDIDO">ATENDIDO</option>
-                                <option value="CANCELADO">CANCELADO</option>
-                                <option value="AUSENTE">AUSENTE</option>
-                            </select>
-                            <button onClick={fetchData} style={{marginLeft: '10px', padding: '5px 10px'}}>Aplicar Filtros</button> {/* ----------Quitar esto luego para solo renderizar una cosa */}
+                            <strong style={{ display: "block", marginBottom: 8, color: "#0f172a" }}>
+                                Filtrar Turnos
+                            </strong>
+
+                            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                                <div style={{ flex: "1 1 220px", minWidth: 160 }}>
+                                    <label style={{ ...styles.label, marginBottom: 6 }}>Médico</label>
+                                    <select
+                                        onChange={(e) => setFilterMedico(e.target.value)}
+                                        style={styles.select}
+                                        value={filterMedico}
+                                    >
+                                        <option value="">Todos los medicos</option>
+                                        {medicos.map((m) => (
+                                        <option key={m._id} value={m._id}>
+                                            {m.username}
+                                        </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div style={{ flex: "1 1 180px", minWidth: 140 }}>
+                                    <label style={{ ...styles.label, marginBottom: 6 }}>Estado</label>
+                                    <select
+                                        onChange={(e) => setFilterEstado(e.target.value)}
+                                        style={styles.select}
+                                        value={filterEstado}
+                                    >
+                                        <option value="">Todos los estados</option>
+                                        <option value="PROGRAMADO">PROGRAMADO</option>
+                                        <option value="ATENDIDO">ATENDIDO</option>
+                                        <option value="CANCELADO">CANCELADO</option>
+                                        <option value="AUSENTE">AUSENTE</option>
+                                    </select>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "flex-end" }}>
+                                <button
+                                    onClick={buscarTurnos}
+                                    type="button"
+                                    style={{
+                                    ...styles.button,
+                                    width: "auto",
+                                    padding: "10px 14px",
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    minHeight: 42,
+                                    }}
+                                >
+                                    Aplicar Filtros
+                                </button>
+                                </div>
+                            </div>
                         </div>
 
+
                         <table style={styles.table}>
+                            {loadingPatients ? <div>Cargando turnos Programados...</div> : (
+                            <>
                             <thead>
                                 <tr>
                                     <th style={styles.th}>Paciente</th>
@@ -355,14 +417,28 @@ const PanelRecepcionista = () => {
                                 <tr key={app._id}>
                                     <td style={styles.td}>{app.paciente?.nombreCompleto || 'N/A'}</td>
                                     <td style={styles.td}>{app.medico?.username || 'N/A'}</td>
-                                    <td style={styles.td}>{new Date(app.fecha).toLocaleDateString()} {app.hora}</td>
+                                    <td style={styles.td}>{new Date(app.fecha).toLocaleDateString('es-BO', { timeZone: 'UTC' })} {app.hora}</td>
                                     <td style={styles.td}>{app.motivo}</td>
                                     <td style={styles.td}>{app.estado}</td>
                                     <td style={styles.td}>
                                         {app.estado === 'PROGRAMADO' && (
                                             <>
-                                                <button onClick={() => handleEditClick(app)} style={{marginRight: '10px'}}>✏️</button>
-                                                <button onClick={() => handleCancelAppointment(app._id)} style={{color: 'red'}}>🚫</button>
+                                                <button 
+                                                    onClick={() => handleEditClick(app)} 
+                                                    style={styles.editButton}
+                                                    type="button"
+                                                >
+                                                    <span style={styles.iconSmall}>✏️</span>
+                                                    <span style={{display: "none"}}>Editar</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleCancelAppointment(app._id)} 
+                                                    style={styles.cancelButton}
+                                                    type="button"
+                                                >
+                                                    <span style={styles.iconSmall}>🚫</span>
+                                                    <span style={{display: "none"}}>Cancelar</span>
+                                                </button>
                                             </>
                                         )}
                                     </td>
@@ -373,6 +449,8 @@ const PanelRecepcionista = () => {
                                 </tr>
                                 )}
                             </tbody>
+                            </>
+                            )}
                         </table>
                     </div>
                 </div>
@@ -384,107 +462,198 @@ const PanelRecepcionista = () => {
 // --- Objeto de Estilos ---
 const styles: { [key: string]: CSSProperties } = {
     container: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '2rem',
+        display: "flex",
+        flexDirection: "column",
+        gap: "2rem",
+        maxWidth: 1200,
+        margin: "2.5rem auto",
+        fontFamily:
+        "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
     },
     managementSection: {
-        display: 'flex',
-        gap: '2rem',
+        display: "flex",
+        gap: "2rem",
+        alignItems: "flex-start",
     },
     formContainer: {
         flex: 1,
-        padding: '1.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        backgroundColor: '#f9f9f9',
+        padding: "1.5rem",
+        borderRadius: 12,
+        background: "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(250,250,255,0.95))",
+        boxShadow: "0 10px 30px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.6)",
+        border: "1px solid rgba(16,24,40,0.04)",
     },
     listContainer: {
         flex: 2,
+        padding: "1.25rem",
+        borderRadius: 12,
+        background: "linear-gradient(180deg, #ffffff, #fbfbff)",
+        boxShadow: "0 8px 20px rgba(15,23,42,0.04)",
+        border: "1px solid rgba(16,24,40,0.04)",
     },
     heading: {
-        borderBottom: '2px solid #007bff',
-        paddingBottom: '0.5rem',
-        marginBottom: '1.5rem',
+        borderBottom: "2px solid rgba(99,102,241,0.18)",
+        paddingBottom: "0.5rem",
+        marginBottom: "1.25rem",
+        color: "#0f172a",
+        fontSize: 18,
+        fontWeight: 700,
     },
     error: {
-        color: 'red',
-        backgroundColor: '#ffebeB',
-        padding: '10px',
-        borderRadius: '4px',
+        color: "#7f1d1d",
+        backgroundColor: "#ffefef",
+        border: "1px solid #fca5a5",
+        padding: "10px 12px",
+        borderRadius: 8,
+        marginBottom: 12,
+        fontSize: 13,
     },
     message: {
-        color: 'green',
-        backgroundColor: '#e6ffec',
-        padding: '10px',
-        borderRadius: '4px',
+        color: "#064e3b",
+        backgroundColor: "#ecfdf5",
+        border: "1px solid #bbf7d0",
+        padding: "10px 12px",
+        borderRadius: 8,
+        marginBottom: 12,
+        fontSize: 13,
     },
     inputGroup: {
-        marginBottom: '1rem',
+        marginBottom: "14px",
     },
     label: {
-        display: 'block',
-        marginBottom: '0.5rem',
-        fontWeight: 500,
+        display: "block",
+        marginBottom: 6,
+        fontSize: 13,
+        color: "#0f172a",
+        fontWeight: 600,
     },
     input: {
-        width: '100%',
-        padding: '10px',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        boxSizing: 'border-box',
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 10,
+        border: "1px solid rgba(15,23,42,0.08)",
+        background: "linear-gradient(180deg, #fff, #fbfbff)",
+        outline: "none",
+        boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+        fontSize: 14,
+        transition: "box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease",
+        boxSizing: "border-box",
     },
     select: {
-        width: '100%',
-        padding: '10px',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        backgroundColor: 'white',
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 10,
+        border: "1px solid rgba(15,23,42,0.08)",
+        background: "white",
+        fontSize: 14,
+        boxSizing: "border-box",
     },
     button: {
-        width: '100%',
-        padding: '12px',
-        background: '#007bff',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        fontSize: '16px',
+        width: "100%",
+        padding: "12px",
+        background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
+        color: "white",
+        border: "none",
+        borderRadius: 10,
+        cursor: "pointer",
+        fontSize: 15,
+        fontWeight: 700,
+        letterSpacing: "0.2px",
+        boxShadow: "0 8px 20px rgba(99,102,241,0.18)",
+        transition: "transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
     },
     table: {
-        width: '100%',
-        borderCollapse: 'collapse',
+        width: "100%",
+        borderCollapse: "collapse",
+        fontSize: 14,
+        color: "#0f172a",
     },
     th: {
-        border: '1px solid #ddd',
-        padding: '8px',
-        backgroundColor: '#f2f2f2',
-        textAlign: 'left',
+        border: "1px solid rgba(15,23,42,0.06)",
+        padding: "10px 12px",
+        backgroundColor: "#f8fafc",
+        textAlign: "left",
+        fontWeight: 700,
     },
     td: {
-        border: '1px solid #ddd',
-        padding: '8px',
+        border: "1px solid rgba(15,23,42,0.04)",
+        padding: "10px 12px",
+        verticalAlign: "middle",
     },
     filtro: {
-        marginBottom: '15px', 
-        padding: '10px', 
-        background: '#eee'
+        marginBottom: "15px",
+        padding: "10px",
+        background: "linear-gradient(90deg, rgba(249,250,255,0.7), rgba(243,244,255,0.9))",
+        borderRadius: 10,
+        border: "1px solid rgba(15,23,42,0.04)",
     },
-    tab: { 
-        padding: '10px 20px', 
-        cursor: 'pointer', 
-        background: '#ddd', 
-        border: 'none', 
-        marginRight: '5px' 
+    tab: {
+        padding: "10px 20px",
+        cursor: "pointer",
+        background: "linear-gradient(90deg, #eef2ff, #f8fafc)",
+        border: "none",
+        marginRight: "8px",
+        borderRadius: 10,
+        fontWeight: 600,
+        color: "#0f172a",
+        boxShadow: "0 4px 10px rgba(15,23,42,0.03)",
     },
-    activeTab: { 
-        padding: '10px 20px', 
-        cursor: 'pointer', 
-        background: '#007bff', 
-        color: 'white', 
-        border: 'none', 
-        marginRight: '5px' 
+    activeTab: {
+        padding: "10px 20px",
+        cursor: "pointer",
+        background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
+        color: "white",
+        border: "none",
+        marginRight: "8px",
+        borderRadius: 10,
+        fontWeight: 700,
+        boxShadow: "0 8px 20px rgba(99,102,241,0.14)",
+    },
+    filterRow: {
+        display: "flex",
+        gap: "12px",
+        alignItems: "center",
+        flexWrap: "wrap",
+    },
+    filterButton: {
+        width: "auto",
+        padding: "10px 14px",
+        borderRadius: 10,
+        fontSize: 14,
+    },
+    editButton: {
+        padding: "8px 10px",
+        borderRadius: 10,
+        border: "none",
+        background: "linear-gradient(90deg,#eef2ff,#c7d2fe)",
+        color: "#0f172a",
+        cursor: "pointer",
+        boxShadow: "0 4px 12px rgba(15, 23, 42, 0.6)",
+        fontSize: 14,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+    },
+    cancelButton: {
+        padding: "8px 10px",
+        borderRadius: 10,
+        border: "none",
+        background: "linear-gradient(90deg,#ffefef,#f4c4c4)",
+        color: "#a71c1cff",
+        cursor: "pointer",
+        boxShadow: "0 4px 12px rgba(15, 23, 42, 0.6)",
+        fontSize: 14,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+    },
+    iconSmall: {
+        fontSize: 14,
+        lineHeight: 1,
     }
 };
+
 
 export default PanelRecepcionista;
