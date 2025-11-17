@@ -183,7 +183,7 @@ const PanelRecepcionista = () => {
         try {
             //usamos el nuevo endpoint PUT general, enviando solo el estado
             await api.put(`/appointments/${id}`, { estado: 'CANCELADO' });
-            fetchData(); // refrescar datos
+            buscarTurnos(); // refrescar datos
 
         } catch (error) {
             alert('Error al cancelar el turno');
@@ -247,8 +247,8 @@ const PanelRecepcionista = () => {
                 <button onClick={() => setTab('PACIENTES')} style={tab === 'PACIENTES' ? styles.activeTab : styles.tab}>Listado de Pacientes</button>
             </div>
             {tab === 'PACIENTES' && (
-                <div>
-                    <h3>Listado Completo de Pacientes</h3>
+                <div style={{width: '75%'}}>
+                    <h3 style={styles.heading}>Listado Completo de Pacientes</h3>
                     {/* Aquí cumples el requisito: Listar Pacientes */}
                     <table style={styles.table}>
                         <thead><tr><th>Nombre</th><th>CI</th><th>Teléfono</th><th>Fecha Nacimiento</th></tr></thead>
@@ -256,9 +256,9 @@ const PanelRecepcionista = () => {
                             {patients.map(p => (
                                 <tr key={p._id}>
                                     <td style={styles.td}>{p.nombreCompleto}</td>
-                                    <td style={styles.td}>{p.CI}</td>
-                                    <td style={styles.td}>{p.telefono}</td>
-                                    <td style={styles.td}>{new Date(p.fechaNacimiento).toLocaleDateString('es-BO', { timeZone: 'UTC' })}</td>
+                                    <td style={{...styles.td, ...styles.tdCentro}}>{p.CI}</td>
+                                    <td style={{...styles.td, ...styles.tdCentro}}>{p.telefono}</td>
+                                    <td style={{...styles.td, ...styles.tdDerecha}}>{new Date(p.fechaNacimiento).toLocaleDateString('es-BO', { timeZone: 'UTC' })}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -293,7 +293,7 @@ const PanelRecepcionista = () => {
                 </div>
             )}
             {tab === 'TURNOS' && (
-                <div>
+                <div style={styles.managementSection}>
                     {/* Formulario de Turnos */}
                     <div style={styles.formContainer}>
                         <h3 style={styles.heading}>{editingId ? 'Modificar Turno' : 'Agendar Nuevo Turno'}</h3>
@@ -464,6 +464,7 @@ const styles: { [key: string]: CSSProperties } = {
     container: {
         display: "flex",
         flexDirection: "column",
+        alignItems: "center",
         gap: "2rem",
         maxWidth: 1200,
         margin: "2.5rem auto",
@@ -476,12 +477,12 @@ const styles: { [key: string]: CSSProperties } = {
         alignItems: "flex-start",
     },
     formContainer: {
-        flex: 1,
         padding: "1.5rem",
         borderRadius: 12,
         background: "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(250,250,255,0.95))",
         boxShadow: "0 10px 30px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.6)",
         border: "1px solid rgba(16,24,40,0.04)",
+        width: "15rem",
     },
     listContainer: {
         flex: 2,
@@ -576,9 +577,15 @@ const styles: { [key: string]: CSSProperties } = {
         fontWeight: 700,
     },
     td: {
-        border: "1px solid rgba(15,23,42,0.04)",
+        border: "1px solid rgba(15, 23, 42, 0.84)",
         padding: "10px 12px",
         verticalAlign: "middle",
+    },
+    tdDerecha:{
+        textAlign: "right",
+    },
+    tdCentro:{
+        textAlign: "center",
     },
     filtro: {
         marginBottom: "15px",
