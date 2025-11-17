@@ -7,6 +7,7 @@ interface Patient {
     nombreCompleto: string;
     CI: string;
     telefono: string;
+    fechaNacimiento: string;
 }
 
 interface Medico{
@@ -231,13 +232,14 @@ const PanelRecepcionista = () => {
                     <h3>Listado Completo de Pacientes</h3>
                     {/* Aquí cumples el requisito: Listar Pacientes */}
                     <table style={styles.table}>
-                        <thead><tr><th>Nombre</th><th>CI</th><th>Teléfono</th></tr></thead>
+                        <thead><tr><th>Nombre</th><th>CI</th><th>Teléfono</th><th>Fecha Nacimiento</th></tr></thead>
                         <tbody>
                             {patients.map(p => (
                                 <tr key={p._id}>
                                     <td style={styles.td}>{p.nombreCompleto}</td>
                                     <td style={styles.td}>{p.CI}</td>
                                     <td style={styles.td}>{p.telefono}</td>
+                                    <td style={styles.td}>{new Date(p.fechaNacimiento).toLocaleDateString()}</td>
                                 </tr>
                             ))}
                         </tbody>
