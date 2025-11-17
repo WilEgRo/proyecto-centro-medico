@@ -6,6 +6,7 @@ interface Patient {
     _id: string;
     nombreCompleto: string;
     CI: string;
+    telefono: string;
 }
 
 interface Medico{
@@ -31,10 +32,18 @@ interface Appointment {
 
 //----- Componente -----
 const PanelRecepcionista = () => {
-    // --- Estados ---
+    // --- Estados de datos ---
     const [patients, setPatients] = useState<Patient[]>([]);
     const [medicos, setMedicos] = useState<Medico[]>([]);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
+
+    // Estadis de UI
+    const [tab, setTab] = useState< 'CREAR' |'TURNOS' | 'PACIENTES'>('TURNOS');
+    const [editingId, setEditingId] = useState<string | null>(null); // ID del turno o paciente en edición
+
+    // Filtros
+    const [filterMedico, setFilterMedico] = useState<string>('');
+    const [filterEstado, setFilterEstado] = useState<string>('');
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -48,6 +57,7 @@ const PanelRecepcionista = () => {
         telefono: '',
     });
 
+    // estado para el formulario de turnos sirve para crear y editar
     const [appointmentForm, setAppointmentForm] = useState({
         paciente: '', // ID del paciente
         medico: '', // ID del médico
@@ -59,8 +69,9 @@ const PanelRecepcionista = () => {
     // --- Efecto para cargar todos los datos ---
     useEffect(() => {
         fetchData();
-    }, []);
+    }, []); // recarga al cambiar filtros
 
+    // --- Función para cargar datos desde la API ---
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -82,7 +93,7 @@ const PanelRecepcionista = () => {
             console.error("Error cargando pacientes:", error);
         }
         try {
-            // hacemos las 3 peticiones en paralelo
+            // hacemos las 2 peticiones en paralelo
             const [/*patientsRes,*/ medicosRes, appointmentsRes] = await Promise.all([
                /* api.get<Patient[]>('/patients'),*/
                 api.get<Medico[]>('/users/medicos'),
@@ -99,6 +110,20 @@ const PanelRecepcionista = () => {
         } finally {
             setLoading(false);
         }
+
+        // cargar turnos con filtros
+        try {
+            let url = '/appointments?estado=PROGRAMADO';
+            if (filterMedico) url += `medicoId=${filterMedico}&`;
+            if (filterEstado) url += `estado=${filterEstado}&`;
+
+            const res = await api.get(url);
+            const data = Array.isArray(res.data) ? res.data : (res.data.appointments || []);
+            setAppointments(data);
+
+        } catch (error) {
+            console.error("Error cargando turnos con filtros:", error);
+        }
     };
 
     // ------ manejadores de formularios ------
@@ -106,6 +131,7 @@ const PanelRecepcionista = () => {
         setPatientForm({ ...patientForm, [e.target.name]: e.target.value }); // soporta solo input
     }
 
+    // ------- Manejador de formulario de turnos ------
     const handleAppointmentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setAppointmentForm({ ...appointmentForm, [e.target.name]: e.target.value }); // soporta input y select
     }
@@ -133,215 +159,330 @@ const PanelRecepcionista = () => {
             setError(err.response?.data?.message || 'Error al crear paciente');
         }
     };
-    // --- Manejador: Crear Turno ---
-    const handleCreateAppointment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(null);
-        setMessage(null);
+
+    // --- manejador de cancelar Appointment ---
+    const handleCancelAppointment = async (id: string) => {
+        if (!confirm("¿Está seguro de que desea cancelar este turno?")) return;
+
         try {
-            await api.post<Appointment>('/appointments', appointmentForm);
-            
-            // Para actualizar la lista de turnos, volvemos a llamar a fetchData
-            // Es más simple que construir el objeto 'Appointment' a mano
-            fetchData(); 
-            
-            setAppointmentForm({ paciente: '', medico: '', fecha: '', hora: '', motivo: '' }); // Limpiar form
-            setMessage('Turno creado con éxito');
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Error al crear turno');
+            //usamos el nuevo endpoint PUT general, enviando solo el estado
+            await api.put(`/appointments/${id}`, { estado: 'CANCELADO' });
+            fetchData(); // refrescar datos
+
+        } catch (error) {
+            alert('Error al cancelar el turno');
+            console.error(error);
         }
     };
+
+    // --- Manejador para iniciar edición de turno ---
+    const handleEditClick = (app: Appointment) => {
+        setEditingId(app._id);
+        // Rellenar el fomulario con los datos del turno seleccionado
+        setAppointmentForm({
+            paciente: app.paciente._id,
+            medico: app.medico._id,
+            fecha: app.fecha.split('T')[0], // extraer solo la parte de la fecha
+            hora: app.hora,
+            motivo: app.motivo,
+        });
+        window.scrollTo(0, 0); // subir al tope para ver el formulario
+    };
+
+    const handleSubmitTurno = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            if (editingId) {
+                // MODO EDICIÓN
+                await api.put(`/appointments/${editingId}`, appointmentForm);
+                alert('Turno actualizado con éxito');
+                setEditingId(null);
+            } else {
+                // MODO CREACIÓN
+                await api.post('/appointments', appointmentForm);
+                alert('Turno creado éxito');
+            }
+            // limpiar y recargar
+            setAppointmentForm({ paciente: '', medico: '', fecha: '', hora: '', motivo: '' });
+            fetchData();
+        } catch (error) {
+            alert('Error al guardar el turno');
+            console.error(error);
+        }
+    }
 
     // --- Renderizado ---
     if (loading) return <div>Cargando datos del panel...</div>;
 
     return (
         <div style={styles.container}>
-        {/* Mensajes Globales */}
-        {error && <p style={styles.error}>{error}</p>}
-        {message && <p style={styles.message}>{message}</p>}
-
-        {/* --- Sección 1: Gestión (Formularios) --- */}
-        <div style={styles.managementSection}>
-             {/* Formulario de Pacientes */}
-            <div style={styles.formContainer}>
-                <h3 style={styles.heading}>Registrar Nuevo Paciente</h3>
-                <form onSubmit={handleCreatePatient}>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Nombre Completo</label>
-                    <input type="text" name="nombreCompleto" value={patientForm.nombreCompleto} onChange={handlePatientChange} style={styles.input} required />
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Cédula (CI)</label>
-                    <input type="text" name="CI" value={patientForm.CI} onChange={handlePatientChange} style={styles.input} required />
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Fecha Nacimiento</label>
-                    <input type="date" name="fechaNacimiento" value={patientForm.fechaNacimiento} onChange={handlePatientChange} style={styles.input} required />
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Teléfono</label>
-                    <input type="text" name="telefono" value={patientForm.telefono} onChange={handlePatientChange} style={styles.input} required />
-                </div>
-                <button type="submit" style={styles.button}>Crear Paciente</button>
-                </form>
+            {/* Mensajes Globales */}
+            {error && <p style={styles.error}>{error}</p>}
+            {message && <p style={styles.message}>{message}</p>}
+            
+            {/* --- BARRA DE NAVEGACIÓN (PESTAÑAS) --- */}
+            <div style={{marginBottom: '20px'}}>
+                <button onClick={() => setTab('CREAR')} style={tab === 'CREAR' ? styles.activeTab : styles.tab}>Registrar Paciente</button>
+                <button onClick={() => setTab('TURNOS')} style={tab === 'TURNOS' ? styles.activeTab : styles.tab}>Gestión de Turnos</button>
+                <button onClick={() => setTab('PACIENTES')} style={tab === 'PACIENTES' ? styles.activeTab : styles.tab}>Listado de Pacientes</button>
             </div>
+            {tab === 'PACIENTES' && (
+                <div>
+                    <h3>Listado Completo de Pacientes</h3>
+                    {/* Aquí cumples el requisito: Listar Pacientes */}
+                    <table style={styles.table}>
+                        <thead><tr><th>Nombre</th><th>CI</th><th>Teléfono</th></tr></thead>
+                        <tbody>
+                            {patients.map(p => (
+                                <tr key={p._id}>
+                                    <td style={styles.td}>{p.nombreCompleto}</td>
+                                    <td style={styles.td}>{p.CI}</td>
+                                    <td style={styles.td}>{p.telefono}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            {tab === 'CREAR' && (
+                <div style={styles.managementSection}>
+                    {/* Formulario de Pacientes */}
+                    <div style={styles.formContainer}>
+                        <h3 style={styles.heading}>Registrar Nuevo Paciente</h3>
+                        <form onSubmit={handleCreatePatient}>
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Nombre Completo</label>
+                            <input type="text" name="nombreCompleto" value={patientForm.nombreCompleto} onChange={handlePatientChange} style={styles.input} required />
+                        </div>
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Cédula (CI)</label>
+                            <input type="text" name="CI" value={patientForm.CI} onChange={handlePatientChange} style={styles.input} required />
+                        </div>
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Fecha Nacimiento</label>
+                            <input type="date" name="fechaNacimiento" value={patientForm.fechaNacimiento} onChange={handlePatientChange} style={styles.input} required />
+                        </div>
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Teléfono</label>
+                            <input type="text" name="telefono" value={patientForm.telefono} onChange={handlePatientChange} style={styles.input} required />
+                        </div>
+                        <button type="submit" style={styles.button}>Crear Paciente</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {tab === 'TURNOS' && (
+                <div>
+                    {/* Formulario de Turnos */}
+                    <div style={styles.formContainer}>
+                        <h3 style={styles.heading}>{editingId ? 'Modificar Turno' : 'Agendar Nuevo Turno'}</h3>
+                        <form onSubmit={handleSubmitTurno}>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Paciente</label>
+                                <select name="paciente" value={appointmentForm.paciente} onChange={handleAppointmentChange} style={styles.select} required>
+                                    <option value="">Seleccione un paciente</option>
+                                    {Array.isArray(patients) && patients.map(p => (
+                                        <option key={p._id} value={p._id}>{p.nombreCompleto} (CI: {p.CI})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Médico</label>
+                                <select name="medico" value={appointmentForm.medico} onChange={handleAppointmentChange} style={styles.select} required>
+                                    <option value="">Seleccione un médico</option>
+                                    {medicos.map(m => (
+                                    <option key={m._id} value={m._id}>{m.username}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Fecha</label>
+                                <input type="date" name="fecha" value={appointmentForm.fecha} onChange={handleAppointmentChange} style={styles.input} required />
+                            </div>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Hora (ej: 10:30)</label>
+                                <input type="time" name="hora" value={appointmentForm.hora} onChange={handleAppointmentChange} style={styles.input} required />
+                            </div>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>Motivo</label>
+                                <input type="text" name="motivo" value={appointmentForm.motivo} onChange={handleAppointmentChange} style={styles.input} required />
+                            </div>
+                            <button type="submit" style={styles.button}>{editingId ? 'Guardar Cambios' : 'Agendar Turno'}</button>
+                            {editingId && (
+                                <button type="button" onClick={() => {setEditingId(null); setAppointmentForm({paciente:'', medico:'', fecha:'', hora:'', motivo:''})}} style={{...styles.button, background: '#ccc', marginTop:'10px'}}>
+                                    Cancelar Edición
+                                </button>
+                            )}
+                        </form>
+                    </div>
 
-            {/* Formulario de Turnos */}
-            <div style={styles.formContainer}>
-                <h3 style={styles.heading}>Agendar Nuevo Turno</h3>
-                <form onSubmit={handleCreateAppointment}>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Paciente</label>
-                    <select name="paciente" value={appointmentForm.paciente} onChange={handleAppointmentChange} style={styles.select} required>
-                        <option value="">Seleccione un paciente</option>
-                        {Array.isArray(patients) && patients.map(p => (
-                            <option key={p._id} value={p._id}>{p.nombreCompleto} (CI: {p.CI})</option>
-                        ))}
-                    </select>
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Médico</label>
-                    <select name="medico" value={appointmentForm.medico} onChange={handleAppointmentChange} style={styles.select} required>
-                        <option value="">Seleccione un médico</option>
-                        {medicos.map(m => (
-                        <option key={m._id} value={m._id}>{m.username}</option>
-                        ))}
-                    </select>
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Fecha</label>
-                    <input type="date" name="fecha" value={appointmentForm.fecha} onChange={handleAppointmentChange} style={styles.input} required />
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Hora (ej: 10:30)</label>
-                    <input type="time" name="hora" value={appointmentForm.hora} onChange={handleAppointmentChange} style={styles.input} required />
-                </div>
-                <div style={styles.inputGroup}>
-                    <label style={styles.label}>Motivo</label>
-                    <input type="text" name="motivo" value={appointmentForm.motivo} onChange={handleAppointmentChange} style={styles.input} required />
-                </div>
-                <button type="submit" style={styles.button}>Agendar Turno</button>
-                </form>
-            </div>
-        </div>
+                    {/* --- Sección 2: Listado de Turnos y Filtros --- */}
+                    <div style={styles.listContainer}>
+                        <h2 style={styles.heading}>Turnos Programados</h2>
+                        {/* Filtrar por turnos */}
+                        <div style={styles.filtro}>
+                            <strong>Filtrar Turnos</strong>
+                            <select onChange={(e) => setFilterMedico(e.target.value)}> 
+                                <option value="">Todos los medicos</option>
+                                {medicos.map(m => (
+                                    <option key={m._id} value={m._id}>{m.username}</option>
+                                ))}
+                            </select>
+                            <select onChange={(e) => setFilterEstado(e.target.value)}>
+                                <option value="">Todos los estados</option>
+                                <option value="PROGRAMADO">PROGRAMADO</option>
+                                <option value="ATENDIDO">ATENDIDO</option>
+                                <option value="CANCELADO">CANCELADO</option>
+                                <option value="AUSENTE">AUSENTE</option>
+                            </select>
+                            <button onClick={fetchData} style={{marginLeft: '10px', padding: '5px 10px'}}>Aplicar Filtros</button> {/* ----------Quitar esto luego para solo renderizar una cosa */}
+                        </div>
 
-        {/* --- Sección 2: Listado de Turnos --- */}
-        <div style={styles.listContainer}>
-            <h2 style={styles.heading}>Turnos Programados</h2>
-            <table style={styles.table}>
-                <thead>
-                    <tr>
-                        <th style={styles.th}>Paciente</th>
-                        <th style={styles.th}>Médico</th>
-                        <th style={styles.th}>Fecha y Hora</th>
-                        <th style={styles.th}>Motivo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {appointments.length > 0 ? appointments.map((app) => (
-                    <tr key={app._id}>
-                        <td style={styles.td}>{app.paciente?.nombreCompleto || 'N/A'}</td>
-                        <td style={styles.td}>{app.medico?.username || 'N/A'}</td>
-                        <td style={styles.td}>{new Date(app.fecha).toLocaleDateString()} {app.hora}</td>
-                        <td style={styles.td}>{app.motivo}</td>
-                    </tr>
-                    )) : (
-                    <tr>
-                        <td colSpan={4} style={{...styles.td, textAlign: 'center'}}>No hay turnos programados.</td>
-                    </tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
+                        <table style={styles.table}>
+                            <thead>
+                                <tr>
+                                    <th style={styles.th}>Paciente</th>
+                                    <th style={styles.th}>Médico</th>
+                                    <th style={styles.th}>Fecha y Hora</th>
+                                    <th style={styles.th}>Motivo</th>
+                                    <th style={styles.th}>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {appointments.length > 0 ? appointments.map((app) => (
+                                <tr key={app._id}>
+                                    <td style={styles.td}>{app.paciente?.nombreCompleto || 'N/A'}</td>
+                                    <td style={styles.td}>{app.medico?.username || 'N/A'}</td>
+                                    <td style={styles.td}>{new Date(app.fecha).toLocaleDateString()} {app.hora}</td>
+                                    <td style={styles.td}>{app.motivo}</td>
+                                    <td style={styles.td}>{app.estado}</td>
+                                    <td style={styles.td}>
+                                        {app.estado === 'PROGRAMADO' && (
+                                            <>
+                                                <button onClick={() => handleEditClick(app)} style={{marginRight: '10px'}}>✏️</button>
+                                                <button onClick={() => handleCancelAppointment(app._id)} style={{color: 'red'}}>🚫</button>
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                                )) : (
+                                <tr>
+                                    <td colSpan={4} style={{...styles.td, textAlign: 'center'}}>No hay turnos programados.</td>
+                                </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 // --- Objeto de Estilos ---
 const styles: { [key: string]: CSSProperties } = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2rem',
-  },
-  managementSection: {
-    display: 'flex',
-    gap: '2rem',
-  },
-  formContainer: {
-    flex: 1,
-    padding: '1.5rem',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    backgroundColor: '#f9f9f9',
-  },
-  listContainer: {
-    flex: 2,
-  },
-  heading: {
-    borderBottom: '2px solid #007bff',
-    paddingBottom: '0.5rem',
-    marginBottom: '1.5rem',
-  },
-  error: {
-    color: 'red',
-    backgroundColor: '#ffebeB',
-    padding: '10px',
-    borderRadius: '4px',
-  },
-  message: {
-    color: 'green',
-    backgroundColor: '#e6ffec',
-    padding: '10px',
-    borderRadius: '4px',
-  },
-  inputGroup: {
-    marginBottom: '1rem',
-  },
-  label: {
-    display: 'block',
-    marginBottom: '0.5rem',
-    fontWeight: 500,
-  },
-  input: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    boxSizing: 'border-box',
-  },
-  select: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    backgroundColor: 'white',
-  },
-  button: {
-    width: '100%',
-    padding: '12px',
-    background: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '16px',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  th: {
-    border: '1px solid #ddd',
-    padding: '8px',
-    backgroundColor: '#f2f2f2',
-    textAlign: 'left',
-  },
-  td: {
-    border: '1px solid #ddd',
-    padding: '8px',
-  },
+    container: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2rem',
+    },
+    managementSection: {
+        display: 'flex',
+        gap: '2rem',
+    },
+    formContainer: {
+        flex: 1,
+        padding: '1.5rem',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        backgroundColor: '#f9f9f9',
+    },
+    listContainer: {
+        flex: 2,
+    },
+    heading: {
+        borderBottom: '2px solid #007bff',
+        paddingBottom: '0.5rem',
+        marginBottom: '1.5rem',
+    },
+    error: {
+        color: 'red',
+        backgroundColor: '#ffebeB',
+        padding: '10px',
+        borderRadius: '4px',
+    },
+    message: {
+        color: 'green',
+        backgroundColor: '#e6ffec',
+        padding: '10px',
+        borderRadius: '4px',
+    },
+    inputGroup: {
+        marginBottom: '1rem',
+    },
+    label: {
+        display: 'block',
+        marginBottom: '0.5rem',
+        fontWeight: 500,
+    },
+    input: {
+        width: '100%',
+        padding: '10px',
+        border: '1px solid #ccc',
+        borderRadius: '4px',
+        boxSizing: 'border-box',
+    },
+    select: {
+        width: '100%',
+        padding: '10px',
+        border: '1px solid #ccc',
+        borderRadius: '4px',
+        backgroundColor: 'white',
+    },
+    button: {
+        width: '100%',
+        padding: '12px',
+        background: '#007bff',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontSize: '16px',
+    },
+    table: {
+        width: '100%',
+        borderCollapse: 'collapse',
+    },
+    th: {
+        border: '1px solid #ddd',
+        padding: '8px',
+        backgroundColor: '#f2f2f2',
+        textAlign: 'left',
+    },
+    td: {
+        border: '1px solid #ddd',
+        padding: '8px',
+    },
+    filtro: {
+        marginBottom: '15px', 
+        padding: '10px', 
+        background: '#eee'
+    },
+    tab: { 
+        padding: '10px 20px', 
+        cursor: 'pointer', 
+        background: '#ddd', 
+        border: 'none', 
+        marginRight: '5px' 
+    },
+    activeTab: { 
+        padding: '10px 20px', 
+        cursor: 'pointer', 
+        background: '#007bff', 
+        color: 'white', 
+        border: 'none', 
+        marginRight: '5px' 
+    }
 };
 
 export default PanelRecepcionista;

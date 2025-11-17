@@ -74,6 +74,22 @@ const PanelAdmin = () => {
     }
   };
 
+  // ---- Funcion para cambiar rol de usuario ---
+  const handleChangeRole = async (userId: string, newRole: string) => {
+    try {
+      //llamamos al nuevo endpoint
+      await api.put(`/users/${userId}`, { role: newRole });
+
+      // Actualizamos la lista localmente
+      setUsers(users.map(u => u._id === userId ? { ...u, role: newRole as UserRole } : u));
+
+      alert('Rol Actualizado con éxito');
+    } catch (error) {
+      alert('Error al actualizar el rol');
+      console.error(error);
+    }
+  };
+
   // --- Renderizado ---
   if (loading) {
     return <div>Cargando usuarios...</div>;
@@ -143,7 +159,17 @@ const PanelAdmin = () => {
             {users.map((user) => (
               <tr key={user._id}>
                 <td style={styles.td}>{user.username}</td>
-                <td style={styles.td}>{user.role}</td>
+                <td style={styles.td}>
+                  <select
+                    value={user.role}
+                    onChange={(e) => handleChangeRole(user._id, e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="MEDICO">Médico</option>
+                    <option value="RECEPCIONISTA">Recepcionista</option>
+                    <option value="ADMIN">Administrador</option>
+                  </select>
+                </td>
               </tr>
             ))}
           </tbody>
